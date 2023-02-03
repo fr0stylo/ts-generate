@@ -10,8 +10,10 @@ import (
 	"os"
 	"path"
 	"strings"
+	"time"
 
 	"github.com/fr0stylo/ts-generator/pkg/generator"
+	"github.com/fr0stylo/ts-generator/pkg/lexer"
 	"github.com/fr0stylo/ts-generator/pkg/parser"
 	"github.com/fr0stylo/ts-generator/pkg/utils"
 )
@@ -159,4 +161,39 @@ Usage:
 `)
 		}
 	}
+}
+
+func main1() {
+	// example := `{
+	// 	"name": "test",
+	// 	"age": 30,
+	// 	"price": 30.56,
+	// 	"sizes": [ "L", "XL", "XXL", "XXXL" ],
+	// 	"startDate": "2019-06-07",
+	// 	"option": {"size": "XL", "color": "red"},
+	// 	"options": [{"size": "XL", "color": "red"}],
+
+	// 	"prices": 30.56
+
+	// }`
+
+	req, err := http.NewRequest("GET", "https://jsonplaceholder.typicode.com/posts", nil)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer resp.Body.Close()
+	start := time.Now()
+
+	t, err := lexer.Tokenize(resp.Body)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	fmt.Printf("t: %v\n", t)
+	fmt.Println("Spent: ", time.Since(start).String())
 }
