@@ -3,8 +3,6 @@ package lexer
 import (
 	"io"
 	"unicode"
-
-	"github.com/samber/lo"
 )
 
 const (
@@ -17,17 +15,6 @@ const (
 	Token_Colon              JsonToken = ':'
 	Token_NewLine            JsonToken = '\n'
 )
-
-var tokens = []byte{
-	byte(Token_OpenSquareBracket),
-	byte(Token_CloseSquareBracket),
-	byte(Token_OpenCurlyBracket),
-	byte(Token_CloseCurlyBracket),
-	byte(Token_Quote),
-	byte(Token_Comma),
-	byte(Token_Colon),
-	byte(Token_NewLine),
-}
 
 const (
 	Array_OpenBracket   = iota
@@ -45,30 +32,29 @@ type JsonToken rune
 type TokenType int
 
 type Token struct {
-	Text string
+	Text []byte
 	Type TokenType
 }
 
 func (t *Token) String() string {
-	return t.Text
+	return string(t.Text)
 }
 
-// func Tokenize(reader io.Reader) ([]*Token, error) {
-// 	tokens := []*Token{}
-// 	l := NewLexer(reader)
+func Tokenize(reader io.Reader) ([]Token, error) {
+	tokens := []Token{}
+	buf, err := io.ReadAll(reader)
+	if err != nil {
+		return nil, err
+	}
 
-// 	for {
-// 		t, err := l.Read()
-// 		if err == io.EOF {
-// 			break
-// 		} else if err != nil {
-// 			return nil, err
-// 		}
-// 		tokens = append(tokens, t)
-// 	}
+	l := NewLexer(buf)
 
-// 	return tokens, nil
-// }
+	for token, err := l.Read(); err == nil; token, err = l.Read() {
+		tokens = append(tokens, token)
+	}
+
+	return tokens, nil
+}
 
 type Lexer struct {
 	r   []byte
@@ -93,31 +79,53 @@ func (l *Lexer) Read() (Token, error) {
 
 	b, err := l.read()
 	if err != nil {
-		return Token{Type: EOF, Text: "EOF"}, io.EOF
+		return Token{Type: EOF, Text: nil}, io.EOF
 	}
 	switch b {
 	case byte(Token_OpenSquareBracket):
-		return Token{Text: string(b), Type: Array_OpenBracket}, nil
+		return Token{Text: []byte{b}, Type: Array_OpenBracket}, nil
 	case byte(Token_CloseSquareBracket):
-		return Token{Text: string(b), Type: Array_CloseBracket}, nil
+		return Token{Text: []byte{b}, Type: Array_CloseBracket}, nil
 	case byte(Token_OpenCurlyBracket):
-		return Token{Text: string(b), Type: Object_OpenBracket}, nil
+		return Token{Text: []byte{b}, Type: Object_OpenBracket}, nil
 	case byte(Token_CloseCurlyBracket):
-		return Token{Text: string(b), Type: Object_CloseBracket}, nil
+		return Token{Text: []byte{b}, Type: Object_CloseBracket}, nil
 	case byte(Token_Colon):
-		return Token{Text: string(b), Type: Colon}, nil
+		return Token{Text: []byte{b}, Type: Colon}, nil
 	case byte(Token_Comma):
-		return Token{Text: string(b), Type: Comma}, nil
+		return Token{Text: []byte{b}, Type: Comma}, nil
 	case byte(Token_Quote):
-		return Token{Text: string(b), Type: Quote}, nil
+		return Token{Text: []byte{b}, Type: Quote}, nil
 	default:
-		sym := []byte{b}
-		for nb, err := l.read(); err == nil && lo.IndexOf(tokens, nb) == -1; nb, err = l.read() {
-			sym = append(sym, nb)
-		}
-		l.unread()
+		return l.parseSymbolic()
+	}
+}
 
-		return Token{Text: string(sym), Type: Symbol}, nil
+func (l *Lexer) parseSymbolic() (Token, error) {
+	sym := []byte{}
+	l.unread()
+
+	for nb, err := l.read(); err == nil && !isTerminationToken(nb); nb, err = l.read() {
+		sym = append(sym, nb)
+	}
+	l.unread()
+
+	return Token{Text: sym, Type: Symbol}, nil
+}
+
+func isTerminationToken(b byte) bool {
+	switch b {
+	case byte(Token_OpenSquareBracket),
+		byte(Token_CloseSquareBracket),
+		byte(Token_OpenCurlyBracket),
+		byte(Token_CloseCurlyBracket),
+		byte(Token_Quote),
+		byte(Token_Comma),
+		byte(Token_Colon),
+		byte(Token_NewLine):
+		return true
+	default:
+		return false
 	}
 }
 
@@ -132,4 +140,8 @@ func (l *Lexer) read() (byte, error) {
 
 func (l *Lexer) unread() {
 	l.pos--
+}
+
+func (l *Lexer) Reset() {
+	l.pos = 0
 }
