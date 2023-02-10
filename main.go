@@ -18,7 +18,7 @@ import (
 	"github.com/fr0stylo/ts-generator/pkg/utils"
 )
 
-func main() {
+func main2() {
 	isInteractive := flag.Bool("i", true, "interactive mode")
 	flag.Parse()
 
@@ -163,37 +163,47 @@ Usage:
 	}
 }
 
-func main1() {
-	// example := `{
-	// 	"name": "test",
-	// 	"age": 30,
-	// 	"price": 30.56,
-	// 	"sizes": [ "L", "XL", "XXL", "XXXL" ],
-	// 	"startDate": "2019-06-07",
-	// 	"option": {"size": "XL", "color": "red"},
-	// 	"options": [{"size": "XL", "color": "red"}],
+func main() {
+	example := `[{
+		"name": "test",
+		"age": 30,
+		"price": 30.56,
+		"pricer": true,
+		"sizes": [ "L", "XL", "XXL", "XXXL" ],
+		"startDate": "2019-06-07",
+		"option": {"size": "XL", "color": "red"},
+		"options": [{"size": "XL", "color": "red"}],
+		"radnom": "lorem ipsum\nasdas",
+		"prices": 30.56
 
-	// 	"prices": 30.56
+	}]`
 
-	// }`
+	// req, err := http.NewRequest("GET", "https://jsonplaceholder.typicode.com/posts", nil)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
 
-	req, err := http.NewRequest("GET", "https://jsonplaceholder.typicode.com/posts", nil)
-	if err != nil {
-		log.Fatal(err)
-	}
+	// resp, err := http.DefaultClient.Do(req)
+	// if err != nil {
+	// 	log.Fatal(err)
+	// }
+	// defer resp.Body.Close()
 
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		log.Fatal(err)
-	}
-	defer resp.Body.Close()
+	// buf, err := io.ReadAll(resp.Body)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
 	start := time.Now()
-
-	t, err := lexer.Tokenize(resp.Body)
-	if err != nil {
-		fmt.Println(err)
-		return
+	// _, err = lexer.Tokenize(resp.Body)
+	l := lexer.NewLexer([]byte(example))
+	for token, err := l.Read(); err == nil; token, err = l.Read() {
+		fmt.Print(token.String())
 	}
-	fmt.Printf("t: %v\n", t)
+	// if err != nil {
+	// 	fmt.Println(err)
+	// 	return
+	// }
+
 	fmt.Println("Spent: ", time.Since(start).String())
 }

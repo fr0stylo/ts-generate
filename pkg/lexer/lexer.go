@@ -1,22 +1,33 @@
 package lexer
 
 import (
-	"bufio"
-	"bytes"
 	"io"
 	"unicode"
+
+	"github.com/samber/lo"
 )
 
 const (
 	Token_OpenSquareBracket  JsonToken = '['
-	Token_CloseSquareBracket           = ']'
-	Token_OpenCurlyBracket             = '{'
-	Token_CloseCurlyBracket            = '}'
-	Token_Quote                        = '"'
-	Token_Comma                        = ','
-	Token_Colon                        = ':'
-	Token_NewLine                      = '\n'
+	Token_CloseSquareBracket JsonToken = ']'
+	Token_OpenCurlyBracket   JsonToken = '{'
+	Token_CloseCurlyBracket  JsonToken = '}'
+	Token_Quote              JsonToken = '"'
+	Token_Comma              JsonToken = ','
+	Token_Colon              JsonToken = ':'
+	Token_NewLine            JsonToken = '\n'
 )
+
+var tokens = []byte{
+	byte(Token_OpenSquareBracket),
+	byte(Token_CloseSquareBracket),
+	byte(Token_OpenCurlyBracket),
+	byte(Token_CloseCurlyBracket),
+	byte(Token_Quote),
+	byte(Token_Comma),
+	byte(Token_Colon),
+	byte(Token_NewLine),
+}
 
 const (
 	Array_OpenBracket   = iota
@@ -25,8 +36,9 @@ const (
 	Object_CloseBracket = iota
 	Comma               = iota
 	Colon               = iota
-	Text                = iota
-	Numeric             = iota
+	Symbol              = iota
+	Quote               = iota
+	EOF                 = iota
 )
 
 type JsonToken rune
@@ -41,117 +53,83 @@ func (t *Token) String() string {
 	return t.Text
 }
 
-func Tokenize(reader io.Reader) ([]*Token, error) {
-	tokens := []*Token{}
-	l := NewLexer(reader)
+// func Tokenize(reader io.Reader) ([]*Token, error) {
+// 	tokens := []*Token{}
+// 	l := NewLexer(reader)
 
-	for {
-		t, err := l.Read()
-		if err == io.EOF {
-			break
-		} else if err != nil {
-			return nil, err
-		}
-		tokens = append(tokens, t)
-	}
+// 	for {
+// 		t, err := l.Read()
+// 		if err == io.EOF {
+// 			break
+// 		} else if err != nil {
+// 			return nil, err
+// 		}
+// 		tokens = append(tokens, t)
+// 	}
 
-	// r := bufio.NewReader(reader)
-
-	// for x, _, err := r.ReadRune(); err == nil; x, _, err = r.ReadRune() {
-	// 	strBuf := bytes.NewBufferString("")
-	// 	strBuf.WriteRune(x)
-
-	// 	switch x {
-	// 	case rune(Token_OpenSquareBracket):
-	// 		tokens = append(tokens, Token{Type: Array_OpenBracket, Text: strBuf.String()})
-	// 	case rune(Token_CloseSquareBracket):
-	// 		tokens = append(tokens, Token{Type: Array_CloseBracket, Text: strBuf.String()})
-	// 	case rune(Token_OpenCurlyBracket):
-	// 		tokens = append(tokens, Token{Type: Object_OpenBracket, Text: strBuf.String()})
-	// 	case rune(Token_CloseCurlyBracket):
-	// 		tokens = append(tokens, Token{Type: Object_CloseBracket, Text: strBuf.String()})
-	// 	case rune(Token_Comma):
-	// 		tokens = append(tokens, Token{Type: Comma, Text: strBuf.String()})
-	// 	case rune(Token_Colon):
-	// 		tokens = append(tokens, Token{Type: Colon, Text: strBuf.String()})
-	// 	case rune(Token_Quote):
-	// 		for peeked, err := r.Peek(1); err == nil && peeked[0] != byte(Token_Quote); peeked, err = r.Peek(1) {
-	// 			sr, _, _ := r.ReadRune()
-	// 			strBuf.WriteRune(sr)
-	// 		}
-
-	// 		sr, _, _ := r.ReadRune()
-	// 		strBuf.WriteRune(sr)
-
-	// 		tokens = append(tokens, Token{Type: Text, Text: strBuf.String()})
-	// 	default:
-	// 		if unicode.IsDigit(x) {
-	// 			for peeked, err := r.Peek(1); err == nil && peeked[0] != byte(Token_Comma) && peeked[0] != byte(Token_NewLine); peeked, err = r.Peek(1) {
-	// 				sr, _, _ := r.ReadRune()
-	// 				strBuf.WriteRune(sr)
-	// 			}
-
-	// 			tokens = append(tokens, Token{Type: Numeric, Text: strBuf.String()})
-	// 		}
-	// 	}
-	// }
-
-	return tokens, nil
-}
+// 	return tokens, nil
+// }
 
 type Lexer struct {
-	r   *bufio.Reader
-	buf *bytes.Buffer
+	r   []byte
+	pos int
 }
 
-func NewLexer(r io.Reader) *Lexer {
+func NewLexer(r []byte) *Lexer {
 	return &Lexer{
-		r:   bufio.NewReader(r),
-		buf: bytes.NewBuffer([]byte{}),
+		r:   r,
+		pos: 0,
 	}
 }
 
-func (l *Lexer) Read() (*Token, error) {
-	l.buf.Reset()
-	x, _, err := l.r.ReadRune()
+func (l *Lexer) Read() (Token, error) {
+	if l.pos >= len(l.r) {
+		return Token{Type: EOF}, io.EOF
+	}
+
+	for unicode.IsSpace(rune(l.r[l.pos])) {
+		l.pos++
+	}
+
+	b, err := l.read()
 	if err != nil {
-		return nil, err
+		return Token{Type: EOF, Text: "EOF"}, io.EOF
 	}
-	l.buf.WriteRune(x)
-	switch x {
-	case rune(Token_OpenSquareBracket):
-		return &Token{Type: Array_OpenBracket, Text: l.buf.String()}, nil
-	case rune(Token_CloseSquareBracket):
-		return &Token{Type: Array_CloseBracket, Text: l.buf.String()}, nil
-	case rune(Token_OpenCurlyBracket):
-		return &Token{Type: Object_OpenBracket, Text: l.buf.String()}, nil
-	case rune(Token_CloseCurlyBracket):
-		return &Token{Type: Object_CloseBracket, Text: l.buf.String()}, nil
-	case rune(Token_Comma):
-		return &Token{Type: Comma, Text: l.buf.String()}, nil
-	case rune(Token_Colon):
-		return &Token{Type: Colon, Text: l.buf.String()}, nil
-	case rune(Token_Quote):
-		a, _ := l.r.ReadSlice(byte(Token_Quote))
-		// for peeked, err := l.r.Peek(1); err == nil && peeked[0] != byte(Token_Quote); peeked, err = l.r.Peek(1) {
-		// 	sr, _, _ := l.r.ReadRune()
-		// 	l.buf.WriteRune(sr)
-		// }
-
-		// sr, _, _ := l.r.ReadRune()
-		l.buf.Write(a)
-
-		return &Token{Type: Text, Text: l.buf.String()}, nil
+	switch b {
+	case byte(Token_OpenSquareBracket):
+		return Token{Text: string(b), Type: Array_OpenBracket}, nil
+	case byte(Token_CloseSquareBracket):
+		return Token{Text: string(b), Type: Array_CloseBracket}, nil
+	case byte(Token_OpenCurlyBracket):
+		return Token{Text: string(b), Type: Object_OpenBracket}, nil
+	case byte(Token_CloseCurlyBracket):
+		return Token{Text: string(b), Type: Object_CloseBracket}, nil
+	case byte(Token_Colon):
+		return Token{Text: string(b), Type: Colon}, nil
+	case byte(Token_Comma):
+		return Token{Text: string(b), Type: Comma}, nil
+	case byte(Token_Quote):
+		return Token{Text: string(b), Type: Quote}, nil
 	default:
-		if unicode.IsDigit(x) {
-			for peeked, err := l.r.Peek(1); err == nil && peeked[0] != byte(Token_Comma) && peeked[0] != byte(Token_NewLine); peeked, err = l.r.Peek(1) {
-				sr, _, _ := l.r.ReadRune()
-				l.buf.WriteRune(sr)
-			}
-
-			return &Token{Type: Numeric, Text: l.buf.String()}, nil
+		sym := []byte{b}
+		for nb, err := l.read(); err == nil && lo.IndexOf(tokens, nb) == -1; nb, err = l.read() {
+			sym = append(sym, nb)
 		}
+		l.unread()
 
-		return l.Read()
+		return Token{Text: string(sym), Type: Symbol}, nil
 	}
+}
+
+func (l *Lexer) read() (byte, error) {
+	if l.pos >= len(l.r) {
+		return 0, io.EOF
+	}
+	b := l.r[l.pos]
+	l.pos++
+	return b, nil
+}
+
+func (l *Lexer) unread() {
+	l.pos--
 }
